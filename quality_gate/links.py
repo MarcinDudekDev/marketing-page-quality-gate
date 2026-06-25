@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 
 Fetcher = Callable[[str], int]
 
+_PROBE_CAP = 100
+
 
 def _base_host(base_url: str | None) -> str | None:
     if base_url is None:
@@ -25,21 +27,32 @@ def _classify_href(href: str, base_url: str | None) -> tuple[str, str]:
     if href.startswith("tel:"):
         return href, "tel"
 
+    parsed_href = urlparse(href)
+    if parsed_href.scheme and parsed_href.scheme not in {"http", "https"}:
+        return href, "other"
+
+    if href.startswith("//"):
+        absolute = "https:" + href
+        return absolute, "outbound"
+
     absolute = urljoin(base_url, href) if base_url else href
-    host = urlparse(absolute).netloc.lower()
+    parsed_absolute = urlparse(absolute)
+    scheme = parsed_absolute.scheme.lower()
+
+    if scheme not in {"http", "https"}:
+        return absolute, "other"
+
+    host = parsed_absolute.netloc.lower()
     base_host = _base_host(base_url)
 
     if base_url is None:
-        kind = "outbound" if urlparse(absolute).scheme in {"http", "https"} and host else "internal"
-        if not urlparse(href).scheme and not href.startswith("//"):
-            kind = "internal"
-        elif urlparse(href).scheme in {"http", "https"}:
-            kind = "outbound"
-        return absolute, kind
+        if not parsed_href.scheme and not href.startswith("//"):
+            return absolute, "internal"
+        return absolute, "outbound"
 
     if host and base_host and host == base_host:
         return absolute, "internal"
-    if not urlparse(href).scheme and not href.startswith("//"):
+    if not parsed_href.scheme and not href.startswith("//"):
         return absolute, "internal"
     return absolute, "outbound"
 
@@ -66,7 +79,7 @@ def _default_fetcher(url: str) -> int:
             if response.status_code >= 400 or response.status_code < 100:
                 response = client.get(url)
             return response.status_code
-    except httpx.HTTPError:
+    except (httpx.HTTPError, httpx.InvalidURL):
         return 0
 
 
@@ -83,12 +96,20 @@ def check_links(
     internal = sum(1 for link in http_links if link["kind"] == "internal")
     outbound = sum(1 for link in http_links if link["kind"] == "outbound")
 
+    seen: set[str] = set()
+    unique_urls: list[str] = []
+    for link in http_links:
+        url = link["url"]
+        if url not in seen:
+            seen.add(url)
+            unique_urls.append(url)
+
     broken: list[dict] = []
     ok = 0
-    for link in http_links:
-        status = probe(link["url"])
+    for url in unique_urls[:_PROBE_CAP]:
+        status = probe(url)
         if status >= 400 or status == 0:
-            broken.append({"url": link["url"], "status": status})
+            broken.append({"url": url, "status": status})
         else:
             ok += 1
 

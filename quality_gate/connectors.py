@@ -2,7 +2,21 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import re
+
 SUPPORTED_PLATFORMS = ["meta", "google", "taboola", "tiktok"]
+
+_SPEND_COLUMNS = frozenset(
+    {
+        "amount spent",
+        "amount spent (usd)",
+        "spend",
+        "cost",
+        "total spent",
+    }
+)
 
 _PLATFORM_CAMPAIGNS: dict[str, list[dict]] = {
     "meta": [
@@ -68,7 +82,10 @@ def _aggregate_totals(campaigns: list[dict]) -> dict:
 def get_campaign_metrics(platform: str) -> dict:
     """Return deterministic mock campaign metrics for a supported platform."""
     if platform not in SUPPORTED_PLATFORMS:
-        raise ValueError(f"Unsupported platform: {platform}")
+        return {
+            "error": f"Unsupported platform: {platform}",
+            "supported": list(SUPPORTED_PLATFORMS),
+        }
 
     campaigns = _PLATFORM_CAMPAIGNS[platform]
     return {
@@ -78,4 +95,43 @@ def get_campaign_metrics(platform: str) -> dict:
         "currency": "USD",
         "campaigns": campaigns,
         "totals": _aggregate_totals(campaigns),
+    }
+
+
+def _parse_spend_value(raw: str) -> float:
+    cleaned = re.sub(r"[$£€,\s]", "", raw.strip())
+    if not cleaned:
+        return 0.0
+    return float(cleaned)
+
+
+def read_spend_csv(csv_text: str) -> dict:
+    """Parse spend totals from an Ads Manager CSV export."""
+    reader = csv.DictReader(io.StringIO(csv_text))
+    if reader.fieldnames is None:
+        raise ValueError("CSV has no header row")
+
+    spend_col: str | None = None
+    for name in reader.fieldnames:
+        if name.strip().lower() in _SPEND_COLUMNS:
+            spend_col = name
+            break
+
+    if spend_col is None:
+        raise ValueError("No spend column found in CSV")
+
+    total = 0.0
+    rows = 0
+    for row in reader:
+        value = row.get(spend_col, "")
+        if value and value.strip():
+            total += _parse_spend_value(value)
+            rows += 1
+
+    return {
+        "total_spend": round(total, 2),
+        "rows": rows,
+        "currency": "USD",
+        "mock": False,
+        "source": "csv",
     }

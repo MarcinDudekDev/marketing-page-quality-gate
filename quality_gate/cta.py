@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 from bs4 import BeautifulSoup
 
-_ACTION_KEYWORDS = (
+_SINGLE_WORD_KEYWORDS = (
     "buy",
-    "sign up",
-    "signup",
-    "get started",
-    "subscribe",
     "start",
     "try",
     "download",
@@ -18,11 +16,29 @@ _ACTION_KEYWORDS = (
     "order",
     "join",
     "shop",
-    "add to cart",
-    "request",
     "register",
+    "subscribe",
+    "signup",
+)
+
+_MULTI_WORD_KEYWORDS = (
+    "sign up",
+    "get started",
+    "add to cart",
     "get the",
 )
+
+_SINGLE_WORD_PATTERNS = tuple(
+    re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    for word in _SINGLE_WORD_KEYWORDS
+)
+
+
+def _text_matches_keywords(text: str) -> bool:
+    lower = text.lower()
+    if any(phrase in lower for phrase in _MULTI_WORD_KEYWORDS):
+        return True
+    return any(pattern.search(text) for pattern in _SINGLE_WORD_PATTERNS)
 
 
 def _is_cta(element) -> bool:
@@ -33,8 +49,8 @@ def _is_cta(element) -> bool:
     if element.get("role", "").lower() == "button":
         return True
 
-    text = element.get_text(strip=True).lower()
-    return any(keyword in text for keyword in _ACTION_KEYWORDS)
+    text = element.get_text(strip=True)
+    return _text_matches_keywords(text)
 
 
 def _body_html(soup: BeautifulSoup, html: str) -> str:
@@ -52,7 +68,9 @@ def _element_offset(element, body_html: str) -> int:
 
     text = element.get_text(strip=True)
     if text:
-        return body_html.find(text)
+        offset = body_html.find(text)
+        if offset >= 0:
+            return offset
     return len(body_html)
 
 

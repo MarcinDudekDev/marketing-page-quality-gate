@@ -10,14 +10,27 @@ _WIDTH_STYLE_RE = re.compile(r"width\s*:\s*(\d+)\s*px", re.IGNORECASE)
 _WIDTH_ATTR_RE = re.compile(r"^(\d+)$")
 
 
+def _is_inside_svg(tag) -> bool:
+    parent = tag.parent
+    while parent is not None:
+        if parent.name == "svg":
+            return True
+        parent = parent.parent
+    return False
+
+
 def _has_horizontal_scroll_risk(soup: BeautifulSoup) -> bool:
     for tag in soup.find_all(style=True):
+        if tag.name == "svg" or _is_inside_svg(tag):
+            continue
         style = tag.get("style", "")
         for match in _WIDTH_STYLE_RE.finditer(style):
             if int(match.group(1)) >= 600:
                 return True
 
     for tag in soup.find_all(width=True):
+        if tag.name == "svg" or _is_inside_svg(tag):
+            continue
         width_value = str(tag.get("width", "")).strip()
         match = _WIDTH_ATTR_RE.match(width_value)
         if match and int(match.group(1)) >= 600:
