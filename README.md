@@ -33,6 +33,9 @@ Spoon, Ruggable, Manscaped). **Not one scored an A** — even big brands ship le
 
 Regenerate it yourself: `PYTHONPATH=. uv run python examples/build_scorecard.py` → `report/scorecard.html`.
 
+**▶ 90-second demo video:** [`demo/demo_video.mp4`](demo/demo_video.mp4) — the gate scoring a leaky page
+F, a clean page A, blocking $10,711 of spend, and the live scorecard. (Script: `demo/VIDEO_SCRIPT.md`.)
+
 ---
 
 ## The tools (8)
