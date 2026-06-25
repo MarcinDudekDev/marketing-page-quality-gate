@@ -21,10 +21,10 @@ _WEIGHTS = {
 }
 
 _RISK_WEIGHTS = {
-    "links": 30,
-    "mobile": 25,
+    "pixels": 30,
+    "links": 25,
     "cta": 20,
-    "pixels": 15,
+    "mobile": 15,
     "speed": 10,
 }
 
@@ -81,7 +81,7 @@ def score_page(
     speed_detail = audit_speed(html)
     links_detail = check_links(html, base_url=base_url, fetcher=fetcher)
 
-    pixels_score = min(100, pixels_detail["count"] * 50)
+    pixels_score = 100 if pixels_detail["count"] >= 1 else 0
     mobile_score = mobile_detail["score"]
     cta_score = cta_detail["score"]
     speed_score = speed_detail["score"]
