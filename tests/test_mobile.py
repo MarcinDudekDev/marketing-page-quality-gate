@@ -28,3 +28,11 @@ def test_bad_horizontal_scroll_risk_from_fixed_width(load):
 
 def test_bad_score_zero(load):
     assert audit_mobile(load("mobile_bad.html"))["score"] == 0
+
+
+def test_max_width_is_not_scroll_risk(load):
+    # `max-width:1200px` is responsive (caps width, shrinks on mobile). The literal
+    # `width:1200px` substring inside it must NOT register as a fixed-width scroll risk.
+    r = audit_mobile(load("mobile_maxwidth_ok.html"))
+    assert r["horizontal_scroll_risk"] is False
+    assert r["score"] == 100

@@ -53,7 +53,10 @@ Keys: `viewport` (bool), `viewport_content` (str|None), `responsive_viewport` (b
 has `width=device-width`), `horizontal_scroll_risk` (bool), `issues` (list[str]), `score` (int).
 - `horizontal_scroll_risk`: True if any fixed width ≥ 600px is declared — `width:<N>px` in an
   inline style OR a `width="<N>"` attribute where N ≥ 600. **v2:** ignore any element that is an
-  `<svg>` or lives inside one (SVG widths are not page layout).
+  `<svg>` or lives inside one (SVG widths are not page layout). **v4 fix:** do NOT match
+  `max-width:<N>px` — `max-width` is a responsive pattern (caps width, shrinks on mobile), the
+  opposite of a scroll risk. Match the `width:` property only when it is NOT preceded by `max-`
+  (e.g. regex `(?<!max-)width\s*:\s*(\d+)\s*px`). `min-width` and bare `width` still count.
 - `score`: `+60` responsive / else `+20` viewport-only / else `+0`; plus `+40` if NOT scroll risk.
 
 ## 3. `cta.cta_clarity(html: str) -> dict`

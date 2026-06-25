@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Responsive Max-Width Container</title>
+</head>
+<body>
+  <!-- max-width is a RESPONSIVE pattern (caps width, shrinks on mobile), NOT a
+       horizontal-scroll risk. The 'width:1200px' substring inside 'max-width:1200px'
+       must NOT trigger the fixed-width heuristic. (min-width / bare width still do.) -->
+  <div style="max-width:1200px; margin:0 auto">
+    <header style="max-width:960px">
+      <h1>Fluid container that never exceeds the viewport</h1>
+      <a href="/signup" class="btn">Get Started</a>
+    </header>
+  </div>
+</body>
+</html>
