@@ -1,0 +1,23 @@
+[project]
+name = "marketing-page-quality-gate"
+version = "0.1.0"
+description = "Marketing Page Quality Gate — deterministic MCP server that scores AI-generated landing pages before launch."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "mcp>=1.2.0",
+    "beautifulsoup4>=4.12.0",
+    "httpx>=0.27.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-json-report>=1.5.0",
+]
+
+# NOTE: This [tool.pytest.ini_options] block is part of the FIXED CONTRACT.
+# Grok must NOT edit pyproject.toml. All runtime deps are pre-installed.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
