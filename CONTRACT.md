@@ -112,18 +112,22 @@ name **`_default_fetcher`**. Broken = status ≥ 400 or == 0. Dedupe URLs before
   column exists.
 
 ## 7. `scoring.score_page(html, base_url=None, fetcher=None, verbose=True) -> dict`
-Five sub-scores (0–100): `pixels = min(100, count*50)`, `mobile`, `cta`, `speed`,
-`links = max(0, 100 - 25*broken_count)` (100 if 0 links checked).
-**v2 weights (item 5)** — sum 1.0: `links .25, mobile .20, cta .20, speed .20, pixels .15`.
+Five sub-scores (0–100): `mobile`, `cta`, `speed`, `links = max(0, 100 - 25*broken_count)`
+(100 if 0 links checked), and **`pixels = 100 if count >= 1 else 0`**.
+**v3 pixels rule:** any single real pixel = full measurability → 100 (a properly-tracked
+GA4-only page must NOT be capped at 50). 0 pixels = 0.
+**Quality weights (item 5)** — sum 1.0: `links .25, mobile .20, cta .20, speed .20, pixels .15`.
 `overall = round(Σ weight·signal)`. Grade: A≥90, B≥80, C≥70, D≥60, else F.
 
 Returns: `grade`, `score`, `signals` (`{pixels,mobile,cta,speed,links}`), `spend_at_risk`
 (see below), and — **only when `verbose=True`** (item 15) — `details` (the 5 sub-dicts incl. `speed`).
 
-**`spend_at_risk` (item 9):** `{"risk_pct": int, "factors": [str, ...]}`. For each signal compute
-`shortfall = 1 - signal/100`; `risk_pct = round(Σ shortfall · risk_weight)` with risk weights
-`links 30, mobile 25, cta 20, pixels 15, speed 10` (sum 100). `factors` lists a human message for
-each signal scoring < 100. A perfect page → `risk_pct 0`, `factors []`.
+**`spend_at_risk` (item 9, v3 buyer-centric model):** `{"risk_pct": int, "factors": [str, ...]}`.
+For each signal `shortfall = 1 - signal/100`; `risk_pct = round(Σ shortfall · risk_weight)`.
+The $-at-risk lens differs from the quality lens: a MISSING PIXEL is the biggest dollar leak (no
+measurement → the whole budget runs blind, unoptimizable), so pixels rank TOP here. Risk weights:
+**`pixels 30, links 25, cta 20, mobile 15, speed 10`** (sum 100). `factors` lists a human message
+for each signal scoring < 100. A perfect page → `risk_pct 0`, `factors []`.
 
 ## 8. `gate.gate_spend(html, base_url=None, platform=None, platform_csv=None, fetcher=None) -> dict`  (NEW — item 10)
 The literal job: refuse to greenlight spend on a leaky page. Score the page (verbose=False).

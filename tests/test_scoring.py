@@ -33,11 +33,22 @@ def test_broken_links_drags_to_b(load, base_url, fetcher):
     assert r["grade"] == "B"
 
 
-def test_no_viewport_grade_c(load, base_url, fetcher):
+def test_single_pixel_is_full_measurability(load, base_url, fetcher):
+    # v3: one real pixel (here a lone Meta Pixel) = full measurability → pixels 100,
+    # never capped at 50. A GA4-only page must score the same.
     r = score_page(load("no_viewport.html"), base_url=base_url, fetcher=fetcher)
     assert r["signals"]["mobile"] == 0
-    assert r["signals"]["pixels"] == 50   # meta pixel only
-    assert r["grade"] == "C"
+    assert r["signals"]["pixels"] == 100
+    assert r["grade"] == "B"
+
+
+def test_missing_pixel_is_top_dollar_risk(load, base_url, fetcher):
+    # v3 buyer model: a no-pixel page risks MORE ad spend than a no-mobile page,
+    # because no measurement = the whole budget runs blind.
+    no_pixels = score_page(load("no_pixels.html"), base_url=base_url, fetcher=fetcher)
+    no_mobile = score_page(load("no_viewport.html"), base_url=base_url, fetcher=fetcher)
+    assert no_pixels["signals"]["pixels"] == 0
+    assert no_pixels["spend_at_risk"]["risk_pct"] > no_mobile["spend_at_risk"]["risk_pct"]
 
 
 def test_no_cta_grade_b(load, base_url, fetcher):
