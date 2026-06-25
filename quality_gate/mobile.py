@@ -6,7 +6,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-_WIDTH_STYLE_RE = re.compile(r"width\s*:\s*(\d+)\s*px", re.IGNORECASE)
+_WIDTH_STYLE_RE = re.compile(r"(?<!max-)width\s*:\s*(\d+)\s*px", re.IGNORECASE)
 _WIDTH_ATTR_RE = re.compile(r"^(\d+)$")
 
 
