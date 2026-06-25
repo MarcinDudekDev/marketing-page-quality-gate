@@ -5,9 +5,11 @@ import asyncio
 
 EXPECTED_TOOLS = {
     "score_page",
+    "gate_spend",
     "check_links",
     "detect_pixels",
     "audit_mobile",
+    "audit_speed",
     "cta_clarity",
     "get_campaign_metrics",
 }

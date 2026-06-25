@@ -30,3 +30,12 @@ def test_no_pixels_count_zero(load):
     r = detect_pixels(load("pixels_none.html"))
     assert r["count"] == 0
     assert r["found"] == []
+
+
+def test_product_text_is_not_a_pixel(load):
+    # "G-Shock", "GTM-compatible", "G-Series" are product/marketing prose, not real
+    # measurement ids — the bare G-/GTM- prefixes must NOT register as pixels.
+    r = detect_pixels(load("pixels_false_positive.html"))
+    assert r["ga4"] is False
+    assert r["gtm"] is False
+    assert r["count"] == 0

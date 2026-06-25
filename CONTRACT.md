@@ -1,167 +1,147 @@
-# CONTRACT — Marketing Page Quality Gate (MCP server)
+# CONTRACT — Marketing Page Quality Gate (MCP server) · v2
 
 You (Grok) are building a **deterministic quality gate for AI-generated marketing
-landing pages**, exposed as an **MCP server**. An automated pytest suite under
-`tests/` grades you. Build code **only under `quality_gate/`** until every test
-passes. The pitch: *"AI velocity never ships a leaky funnel."*
+landing pages**, exposed as an **MCP server**. An automated pytest suite under `tests/`
+grades you. Build code **only under `quality_gate/`** until every test passes. The pitch:
+*"AI velocity never ships a leaky funnel."*
+
+> **v2 note:** a 3-agent review (see `FIXES.md`) found correctness/honesty bugs and added
+> strategic features. The contract below is the corrected, expanded target. Match the EXACT
+> dict keys, scoring weights, penalties, and grade thresholds — the tests assert exact numbers.
 
 ## Hard rules
-- **Python 3.14 + uv only.** All deps are pre-installed (`mcp`, `beautifulsoup4`,
-  `httpx`, `pytest`, `pytest-json-report`). Use `uv run`. **Do NOT run `uv add`
-  or edit `pyproject.toml`** — deps are fixed.
-- **NEVER edit, read-as-authoritative, or try to satisfy by editing anything in:**
-  `tests/`, `contract/`, `fixtures/`, `CONTRACT.md`, `BRIEF.md`, `pyproject.toml`,
-  `.python-version`, `build_loop.sh`. These are the fixed contract and are restored
+- **Python 3.14 + uv only.** Deps pre-installed (`mcp`, `beautifulsoup4`, `httpx`, `pytest`,
+  `pytest-json-report`). Use `uv run`. **Do NOT run `uv add` or edit `pyproject.toml`.**
+- **NEVER edit anything in:** `tests/`, `contract/`, `fixtures/`, `CONTRACT.md`, `BRIEF.md`,
+  `FIXES.md`, `pyproject.toml`, `.python-version`, `build_loop.sh`. The contract is restored
   every round.
-- **All scoring functions are pure and offline.** No network calls inside the pure
-  functions. Parse HTML with BeautifulSoup (`bs4`). Network (httpx) is allowed ONLY
-  inside the MCP server's url-fetch path and the *default* link fetcher — never in
-  the pure functions the tests call.
-- Keep code clean, typed (type hints), small modules. No global state.
+- **Pure scoring functions are offline.** Parse HTML with BeautifulSoup. Network (httpx) is
+  allowed ONLY in the MCP server's url-fetch path and the *default* link fetcher.
+- Clean, typed, small modules. No global state.
 
-## Package layout to build (under `quality_gate/`)
+## Package layout (under `quality_gate/`)
 ```
 quality_gate/__init__.py      # re-export the pure functions
 quality_gate/pixels.py        # detect_pixels
 quality_gate/mobile.py        # audit_mobile
-quality_gate/cta.py           # cta_clarity
+quality_gate/cta.py           # cta_clarity  (+ _element_offset helper)
+quality_gate/speed.py         # audit_speed          (NEW in v2)
 quality_gate/links.py         # extract_links, check_links
+quality_gate/connectors.py    # get_campaign_metrics, read_spend_csv, SUPPORTED_PLATFORMS
 quality_gate/scoring.py       # score_page
-quality_gate/connectors.py    # get_campaign_metrics, SUPPORTED_PLATFORMS  (MOCKED)
-quality_gate/server.py        # FastMCP server: mcp instance + main(); 6 tools
+quality_gate/gate.py          # gate_spend           (NEW in v2)
+quality_gate/server.py        # FastMCP server: mcp + main(); 8 tools
 ```
 
 ---
 
 ## 1. `pixels.detect_pixels(html: str) -> dict`
-Detect marketing/analytics pixels by case-insensitive string/regex match.
+Keys: `meta_pixel`, `ga4`, `gtm`, `tiktok` (bools), `found` (present keys in canonical
+order `["meta_pixel","ga4","gtm","tiktok"]`), `count` (int).
+- `meta_pixel`: `fbq(` OR `connect.facebook.net` OR `fbevents.js`
+- `ga4`: `googletagmanager.com/gtag/js` OR (`gtag(` present AND a real measurement id present)
+- `gtm`: `googletagmanager.com/gtm.js` OR a real GTM container id present
+- `tiktok`: `analytics.tiktok.com` OR `ttq.load` OR `ttq(`
 
-Return dict with keys:
-- `meta_pixel: bool` — True if any of: `fbq(`, `connect.facebook.net`, `fbevents.js`
-- `ga4: bool` — True if `googletagmanager.com/gtag/js` OR (`gtag(` present AND `G-` present)
-- `gtm: bool` — True if `googletagmanager.com/gtm.js` OR `GTM-`
-- `tiktok: bool` — True if `analytics.tiktok.com` OR `ttq.load` OR `ttq(`
-- `found: list[str]` — the present keys among `["meta_pixel","ga4","gtm","tiktok"]`,
-  in that canonical order
-- `count: int` — `len(found)`
+**v2 fix (item 2):** the GA4/GTM id checks must match the real id SHAPE, not the bare prefix.
+A GA4 id is `G-` + **4+ uppercase alphanumerics** on a word boundary (regex `\bG-[A-Z0-9]{4,}\b`,
+case-SENSITIVE). A GTM id is `GTM-` + **5+ uppercase alphanumerics** (`\bGTM-[A-Z0-9]{5,}\b`,
+case-SENSITIVE). Bare `G-`/`GTM-` in prose ("G-Shock", "GTM-compatible") must NOT register.
 
 ## 2. `mobile.audit_mobile(html: str) -> dict`
-Return dict with keys:
-- `viewport: bool` — a `<meta name="viewport">` tag exists
-- `viewport_content: str | None` — its `content` attribute (or None)
-- `responsive_viewport: bool` — viewport content contains `width=device-width`
-- `horizontal_scroll_risk: bool` — True if the HTML declares any fixed width ≥ 600px:
-  match `width: <N>px` in inline styles OR a `width="<N>"` attribute where N ≥ 600.
-  (A `width=device-width` viewport has no digits and must NOT trigger this.)
-- `issues: list[str]` — short human strings for any problems found
-- `score: int` (0–100):
-  - `+60` if `responsive_viewport`, else `+20` if `viewport` (non-responsive), else `+0`
-  - `+40` if NOT `horizontal_scroll_risk`, else `+0`
-
-So: responsive + no-scroll-risk = **100**; missing viewport + scroll risk = **0**.
+Keys: `viewport` (bool), `viewport_content` (str|None), `responsive_viewport` (bool, content
+has `width=device-width`), `horizontal_scroll_risk` (bool), `issues` (list[str]), `score` (int).
+- `horizontal_scroll_risk`: True if any fixed width ≥ 600px is declared — `width:<N>px` in an
+  inline style OR a `width="<N>"` attribute where N ≥ 600. **v2:** ignore any element that is an
+  `<svg>` or lives inside one (SVG widths are not page layout).
+- `score`: `+60` responsive / else `+20` viewport-only / else `+0`; plus `+40` if NOT scroll risk.
 
 ## 3. `cta.cta_clarity(html: str) -> dict`
-A CTA is an `<a>` or `<button>` that is action-oriented. Treat an element as a CTA if
-ANY holds:
-- its `class` contains `btn` or `cta` (case-insensitive substring), OR
-- it has `role="button"`, OR
-- its stripped, lower-cased text contains any action keyword:
-  `buy`, `sign up`, `signup`, `get started`, `subscribe`, `start`, `try`,
-  `download`, `claim`, `book`, `order`, `join`, `shop`, `add to cart`,
-  `request`, `register`, `get the`.
+A CTA is an `<a>`/`<button>` where ANY holds: `class` contains `btn`/`cta`; `role="button"`;
+or its text matches an action keyword.
+**v2 fix (item 1):** single-word keywords match on **word boundaries** (regex `\b…\b`,
+case-insensitive) so `try`✗`industry`, `book`✗`facebook`, `order`✗`reorder`, `start`✗`restart`,
+`shop`✗`workshop`. Single-word set: `buy, start, try, download, claim, book, order, join, shop,
+register, subscribe, signup`. Multi-word phrases use plain substring: `sign up, get started,
+add to cart, get the`.
 
-Return dict with keys:
-- `cta_count: int` — number of CTA elements
-- `primary_cta: str | None` — stripped text of the FIRST CTA in document order (or None)
-- `has_cta: bool` — `cta_count > 0`
-- `above_the_fold: bool` — the first CTA's character offset **within the `<body>`**
-  is `<= 0.5 * len(body_html)` (first half of the body; measuring inside `<body>` so a
-  heavy `<head>` of tracking scripts does not push a top-of-page CTA below the fold).
-  False if no CTA. (If there is no `<body>` tag, measure against the whole document.)
-- `score: int` (0–100):
-  - `+50` if `has_cta`
-  - `+30` if `above_the_fold`
-  - `+20` if `1 <= cta_count <= 3` (reasonable focus); 0 bonus if `cta_count > 3`
+Keys: `cta_count`, `primary_cta` (first CTA text | None), `has_cta`, `above_the_fold`, `score`.
+- `above_the_fold`: first CTA's offset within `<body>` ≤ `0.5 * len(body_html)`. False if no CTA.
+- **v2 fix (item 3):** the offset helper **`_element_offset(element, body_html) -> int`** must
+  return `len(body_html)` (a below-fold sentinel) when the element can't be located — NEVER `-1`
+  (since `-1 <= fold_line` would falsely read as above-the-fold). Keep this helper name.
+- `score`: `+50` has_cta; `+30` above_the_fold; `+20` if `1 <= cta_count <= 3`.
 
-Examples from fixtures: one top CTA = **100**; footer-only single CTA = **70**
-(50 + 0 + 20); five top CTAs = **80** (50 + 30 + 0); no CTA = **0**.
+## 4. `speed.audit_speed(html: str) -> dict`  (NEW — item 5)
+Cheap static load-speed signal (no browser). Keys: `html_bytes` (int, `len(html.encode("utf-8"))`),
+`render_blocking_scripts` (int), `imgs_missing_dimensions` (int), `issues` (list[str]), `score` (int).
+- `render_blocking_scripts`: external `<script src>` **inside `<head>`** WITHOUT `async`/`defer`.
+- `imgs_missing_dimensions`: `<img>` lacking width AND/OR height attribute (count if either missing).
+- `score = max(0, 100 - size_penalty - blocking_penalty - img_penalty)` where:
+  - `size_penalty`: `40` if html_bytes > 250·1024; `20` if > 100·1024; else `0`
+  - `blocking_penalty`: `min(45, 15 * render_blocking_scripts)`
+  - `img_penalty`: `min(30, 10 * imgs_missing_dimensions)`
 
-## 4. `links` module
-### `extract_links(html: str, base_url: str | None = None) -> list[dict]`
-For every `<a href>`, return `{"href": raw, "url": absolute, "kind": kind}` where `kind`:
-- `anchor` if href starts with `#`
-- `mailto` if starts with `mailto:`
-- `tel` if starts with `tel:`
-- otherwise it is an http link: resolve to absolute against `base_url`
-  (use `urllib.parse.urljoin`). `internal` if its host equals `base_url`'s host
-  (or it was relative), else `outbound`. If `base_url` is None, relative links are
-  `internal` and absolute ones `outbound`.
-
-`url` is the absolute resolved URL for http links; for anchor/mailto/tel it is the raw href.
+## 5. `links` module
+### `extract_links(html, base_url=None) -> list[dict]`
+Each `{"href": raw, "url": absolute, "kind": kind}`. Kinds: `anchor` (`#…`), `mailto`, `tel`,
+`internal`, `outbound`, `other`.
+- **v2 fix (item 4):** a **protocol-relative** href (`//cdn.example.com/x`) is `outbound`, with
+  `url` given an explicit `https:` scheme (`"https:" + href`) so it is probeable.
+- Non-http(s) schemes (`javascript:`, `data:`, …) → kind `other` (never probed).
+- Relative → `internal` (resolved via `urljoin`). Absolute same-host → `internal`, else `outbound`.
 
 ### `check_links(html, base_url=None, fetcher=None) -> dict`
-Only http(s) links (`internal` + `outbound`) are fetched. `fetcher(url) -> int` returns
-an HTTP status (0 = unreachable). If `fetcher` is None, default to a real httpx HEAD/GET
-probe (network — used only in production, never in tests). A link is **broken** if its
-status `>= 400` or `== 0`.
+Probe only `internal`+`outbound`. `fetcher(url) -> int` (0 = unreachable). Default fetcher uses
+httpx; **v2 fix (item 4):** its except clause must catch `(httpx.HTTPError, httpx.InvalidURL)` —
+`InvalidURL` is NOT an `HTTPError` subclass and would otherwise crash `score_page`. Keep the helper
+name **`_default_fetcher`**. Broken = status ≥ 400 or == 0. Dedupe URLs before probing; cap probes
+(≤100). Keys: `total`, `internal`, `outbound`, `ok`, `broken` (`[{url,status}]`), `has_broken`.
 
-Return dict:
-- `total: int` — number of http links checked
-- `internal: int`, `outbound: int`
-- `ok: int` — non-broken count
-- `broken: list[dict]` — `[{"url": ..., "status": ...}, ...]`
-- `has_broken: bool`
-
-## 5. `scoring.score_page(html, base_url=None, fetcher=None) -> dict`
-Composite gate. Compute the four sub-scores (0–100):
-- `pixels = min(100, detect_pixels(html)["count"] * 50)`
-- `mobile = audit_mobile(html)["score"]`
-- `cta    = cta_clarity(html)["score"]`
-- `links  = max(0, 100 - 25 * len(check_links(...)["broken"]))`; if 0 links checked → 100
-
-Weighted overall = `round(0.20*pixels + 0.25*mobile + 0.25*cta + 0.30*links)`.
-
-Grade: `A` ≥ 90, `B` ≥ 80, `C` ≥ 70, `D` ≥ 60, else `F`.
-
-Return dict:
-- `grade: str`
-- `score: int` — the weighted overall
-- `signals: dict` — `{"pixels": int, "mobile": int, "cta": int, "links": int}`
-- `details: dict` — the full sub-dicts: `{"pixels": ..., "mobile": ..., "cta": ..., "links": ...}`
-
-## 6. `connectors` module (HALF-A — MOCKED, but honest)
+## 6. `connectors` module
 - `SUPPORTED_PLATFORMS = ["meta", "google", "taboola", "tiktok"]`
-- `get_campaign_metrics(platform: str) -> dict`:
-  - raise `ValueError` for any platform not in `SUPPORTED_PLATFORMS`
-  - otherwise return a **deterministic** dict (no randomness — same input → same output):
-    - `platform: str`
-    - `mock: True` (never claim it's live)
-    - `note: str` — e.g. `"MOCK DATA — plug real <platform> API keys in connectors.py"`
-    - `currency: "USD"`
-    - `campaigns: list[dict]` — at least one campaign, each with keys
-      `name, spend, impressions, clicks, conversions, roas`
-    - `totals: dict` — aggregate spend/impressions/clicks/conversions
+- `get_campaign_metrics(platform) -> dict`: for a supported platform return deterministic mock
+  data: `platform`, `mock: True`, `note` (mentions plugging real keys), `currency: "USD"`,
+  `campaigns` (≥1, each `name/spend/impressions/clicks/conversions/roas`), `totals`.
+  **v2 fix (item 6):** for an UNKNOWN platform, **return a structured `{"error": ..., "supported":
+  [...]}` dict — do NOT raise.**
+- `read_spend_csv(csv_text: str) -> dict`  (NEW — item 10): parse REAL spend from an Ads Manager
+  CSV export. Find a spend column among (case-insensitive) `amount spent`, `amount spent (usd)`,
+  `spend`, `cost`, `total spent`; sum it (strip `$ £ € ,`). Return `total_spend` (float, rounded 2),
+  `rows` (int), `currency: "USD"`, `mock: False`, `source: "csv"`. Raise `ValueError` if no spend
+  column exists.
 
-## 7. `server` module — the MCP server
-Build a `FastMCP` app exposing 6 tools. Required module attributes:
-- `mcp` — the `FastMCP(...)` instance (give it a real name, e.g. `"marketing-page-quality-gate"`)
-- `main()` — callable that runs the server (`mcp.run()`); also wire `if __name__ == "__main__": main()`
+## 7. `scoring.score_page(html, base_url=None, fetcher=None, verbose=True) -> dict`
+Five sub-scores (0–100): `pixels = min(100, count*50)`, `mobile`, `cta`, `speed`,
+`links = max(0, 100 - 25*broken_count)` (100 if 0 links checked).
+**v2 weights (item 5)** — sum 1.0: `links .25, mobile .20, cta .20, speed .20, pixels .15`.
+`overall = round(Σ weight·signal)`. Grade: A≥90, B≥80, C≥70, D≥60, else F.
 
-Register exactly these tool names (use `@mcp.tool()`):
-- `score_page(url: str | None = None, html: str | None = None)` — if `url` given, fetch
-  HTML with httpx and use its host as base_url; else score the `html` string. Return
-  `scoring.score_page(...)`.
-- `check_links(url: str | None = None, html: str | None = None)` → `links.check_links(...)`
-- `detect_pixels(url: str | None = None, html: str | None = None)` → `pixels.detect_pixels(...)`
-- `audit_mobile(url: str | None = None, html: str | None = None)` → `mobile.audit_mobile(...)`
-- `cta_clarity(url: str | None = None, html: str | None = None)` → `cta.cta_clarity(...)`
-- `get_campaign_metrics(platform: str)` → `connectors.get_campaign_metrics(platform)`
+Returns: `grade`, `score`, `signals` (`{pixels,mobile,cta,speed,links}`), `spend_at_risk`
+(see below), and — **only when `verbose=True`** (item 15) — `details` (the 5 sub-dicts incl. `speed`).
 
-The tool wrappers may fetch URLs over the network; the underlying pure functions never do.
-Make sure `from quality_gate import server` imports with NO side effects (do not start the
-server at import time) and that `await mcp.list_tools()` returns the six tools.
+**`spend_at_risk` (item 9):** `{"risk_pct": int, "factors": [str, ...]}`. For each signal compute
+`shortfall = 1 - signal/100`; `risk_pct = round(Σ shortfall · risk_weight)` with risk weights
+`links 30, mobile 25, cta 20, pixels 15, speed 10` (sum 100). `factors` lists a human message for
+each signal scoring < 100. A perfect page → `risk_pct 0`, `factors []`.
+
+## 8. `gate.gate_spend(html, base_url=None, platform=None, platform_csv=None, fetcher=None) -> dict`  (NEW — item 10)
+The literal job: refuse to greenlight spend on a leaky page. Score the page (verbose=False).
+Spend source: if `platform_csv` given → `read_spend_csv`; else mock via `get_campaign_metrics`.
+Returns: `verdict` (`"PASS"` if grade in {A,B,C} else `"BLOCK"`), `grade`, `score`,
+`monthly_spend` (float), `currency`, `risk_pct`, `spend_at_risk` (= `monthly_spend*risk_pct/100`,
+rounded 2), `factors`, `spend_source` (`"csv"`|`"mock"`), `reason` (str).
+
+## 9. `server` module — the MCP server
+`FastMCP("marketing-page-quality-gate")` as module attr `mcp`; a `main()` running `mcp.run()`;
+`if __name__ == "__main__": main()`. Register **8** tools: `score_page`, `gate_spend`,
+`check_links`, `detect_pixels`, `audit_mobile`, `audit_speed`, `cta_clarity`,
+`get_campaign_metrics`. Page tools take `url` (fetched server-side via httpx) OR `html`.
+`score_page` exposes `verbose: bool = False`. **v2 (item 12):** every page tool's docstring must
+say "pass a live `url` (fetched server-side) OR a raw `html` string" + one line on the return shape.
+Importing `server` must have NO side effects; `await mcp.list_tools()` returns the 8 tools.
 
 ---
 
 ## Definition of done
-`uv run pytest -q` is fully green. That is the only finish line.
+`uv run pytest -q` fully green. That is the only finish line.

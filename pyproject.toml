@@ -10,6 +10,9 @@ dependencies = [
     "httpx>=0.27.0",
 ]
 
+[project.scripts]
+quality-gate = "quality_gate.server:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
