@@ -1,0 +1,195 @@
+[
+  {
+    "name": "Dr. Squatch",
+    "url": "https://drsquatch.com",
+    "grade": "B",
+    "score": 81,
+    "signals": {
+      "pixels": 100,
+      "mobile": 100,
+      "cta": 80,
+      "speed": 25,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 12,
+      "factors": [
+        "Weak or missing CTAs leave revenue on the table",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "HelloFresh",
+    "url": "https://www.hellofresh.com",
+    "grade": "B",
+    "score": 86,
+    "signals": {
+      "pixels": 100,
+      "mobile": 100,
+      "cta": 100,
+      "speed": 30,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 7,
+      "factors": [
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "Bombas",
+    "url": "https://bombas.com",
+    "grade": "C",
+    "score": 79,
+    "signals": {
+      "pixels": 100,
+      "mobile": 100,
+      "cta": 80,
+      "speed": 15,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 12,
+      "factors": [
+        "Weak or missing CTAs leave revenue on the table",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "AG1",
+    "url": "https://drinkag1.com",
+    "grade": "C",
+    "score": 74,
+    "signals": {
+      "pixels": 100,
+      "mobile": 60,
+      "cta": 80,
+      "speed": 30,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 17,
+      "factors": [
+        "Weak or missing CTAs leave revenue on the table",
+        "Mobile layout issues hurt on-device conversion",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "Magic Spoon",
+    "url": "https://magicspoon.com",
+    "grade": "D",
+    "score": 61,
+    "signals": {
+      "pixels": 0,
+      "mobile": 100,
+      "cta": 80,
+      "speed": 0,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 44,
+      "factors": [
+        "Missing tracking pixels blind optimization",
+        "Weak or missing CTAs leave revenue on the table",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "Ruggable",
+    "url": "https://ruggable.com",
+    "grade": "F",
+    "score": 59,
+    "signals": {
+      "pixels": 0,
+      "mobile": 60,
+      "cta": 80,
+      "speed": 30,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 47,
+      "factors": [
+        "Missing tracking pixels blind optimization",
+        "Weak or missing CTAs leave revenue on the table",
+        "Mobile layout issues hurt on-device conversion",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "Manscaped",
+    "url": "https://manscaped.com",
+    "grade": "D",
+    "score": 67,
+    "signals": {
+      "pixels": 0,
+      "mobile": 100,
+      "cta": 80,
+      "speed": 30,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 41,
+      "factors": [
+        "Missing tracking pixels blind optimization",
+        "Weak or missing CTAs leave revenue on the table",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  },
+  {
+    "name": "Reference build (illustrative)",
+    "url": "examples/illustrative_A_reference.html",
+    "grade": "A",
+    "score": 100,
+    "signals": {
+      "pixels": 100,
+      "mobile": 100,
+      "cta": 100,
+      "speed": 100,
+      "links": 100
+    },
+    "spend_at_risk": {
+      "risk_pct": 0,
+      "factors": []
+    },
+    "ok": true
+  },
+  {
+    "name": "Textbook leaky funnel (illustrative)",
+    "url": "examples/illustrative_F_leaky.html",
+    "grade": "F",
+    "score": 24,
+    "signals": {
+      "pixels": 0,
+      "mobile": 0,
+      "cta": 0,
+      "speed": 90,
+      "links": 25
+    },
+    "spend_at_risk": {
+      "risk_pct": 85,
+      "factors": [
+        "Missing tracking pixels blind optimization",
+        "Broken or unreachable links reduce conversion",
+        "Weak or missing CTAs leave revenue on the table",
+        "Mobile layout issues hurt on-device conversion",
+        "Slow page load increases bounce before the CTA"
+      ]
+    },
+    "ok": true
+  }
+]
