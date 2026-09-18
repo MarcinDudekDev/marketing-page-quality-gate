@@ -169,4 +169,4 @@ quality_gate/               # the implementation (Grok-built)
 
 ---
 
-*Built for the It's Today Media build challenge · Marcin Dudek · marcin.dudek.dev@gmail.com*
+*Built for the It's Today Media build challenge · [Marcin Dudek](https://marcindudek.dev) · marcin.dudek.dev@gmail.com*
